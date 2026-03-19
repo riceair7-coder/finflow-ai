@@ -1,0 +1,73 @@
+{
+  "title": "FinFlow AI Overview",
+  "uid": "finflow-overview",
+  "schemaVersion": 38,
+  "refresh": "30s",
+  "panels": [
+    {
+      "id": 1,
+      "title": "API Request Rate",
+      "type": "timeseries",
+      "gridPos": { "x": 0, "y": 0, "w": 12, "h": 8 },
+      "targets": [{
+        "expr": "sum(rate(http_requests_total{job=\"finflow-api\"}[5m])) by (status)",
+        "legendFormat": "{{status}}"
+      }]
+    },
+    {
+      "id": 2,
+      "title": "API P95 Latency",
+      "type": "timeseries",
+      "gridPos": { "x": 12, "y": 0, "w": 12, "h": 8 },
+      "targets": [{
+        "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{job=\"finflow-api\"}[5m])) by (le))",
+        "legendFormat": "P95"
+      }]
+    },
+    {
+      "id": 3,
+      "title": "AI Classification Rate",
+      "type": "stat",
+      "gridPos": { "x": 0, "y": 8, "w": 6, "h": 4 },
+      "targets": [{
+        "expr": "rate(ai_classifications_total[5m])",
+        "legendFormat": "classifications/s"
+      }]
+    },
+    {
+      "id": 4,
+      "title": "DB Connections",
+      "type": "gauge",
+      "gridPos": { "x": 6, "y": 8, "w": 6, "h": 4 },
+      "targets": [{
+        "expr": "pg_stat_activity_count",
+        "legendFormat": "connections"
+      }],
+      "options": { "thresholds": { "steps": [
+        { "color": "green", "value": 0 },
+        { "color": "yellow", "value": 50 },
+        { "color": "red", "value": 80 }
+      ]}}
+    },
+    {
+      "id": 5,
+      "title": "Redis Memory Usage",
+      "type": "gauge",
+      "gridPos": { "x": 12, "y": 8, "w": 6, "h": 4 },
+      "targets": [{
+        "expr": "redis_memory_used_bytes / redis_memory_max_bytes * 100",
+        "legendFormat": "%"
+      }]
+    },
+    {
+      "id": 6,
+      "title": "Celery Queue Length",
+      "type": "stat",
+      "gridPos": { "x": 18, "y": 8, "w": 6, "h": 4 },
+      "targets": [{
+        "expr": "celery_queue_length",
+        "legendFormat": "queued tasks"
+      }]
+    }
+  ]
+}

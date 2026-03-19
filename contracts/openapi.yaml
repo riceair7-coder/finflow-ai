@@ -1,0 +1,428 @@
+openapi: 3.1.0
+info:
+  title: FinFlow AI API
+  description: AI-powered financial management platform
+  version: 1.0.0
+
+servers:
+  - url: http://localhost:8000
+    description: Local development
+  - url: https://api.finflow.ai
+    description: Production
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    ApiResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          nullable: true
+        error:
+          type: string
+          nullable: true
+
+    PaginationMeta:
+      type: object
+      properties:
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+        pages:
+          type: integer
+
+    SettlementStatus:
+      type: string
+      enum: [pending, reviewing, approved, rejected, paid]
+
+    InvoiceStatus:
+      type: string
+      enum: [draft, sent, paid, overdue, cancelled]
+
+    TransactionStatus:
+      type: string
+      enum: [pending, classified, approved, rejected]
+
+    Settlement:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        settlement_no:
+          type: string
+        vendor_id:
+          type: string
+          format: uuid
+        period_start:
+          type: string
+          format: date
+        period_end:
+          type: string
+          format: date
+        total_amount:
+          type: number
+        matched_transactions:
+          type: array
+          items:
+            type: string
+        status:
+          $ref: '#/components/schemas/SettlementStatus'
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    Invoice:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        invoice_no:
+          type: string
+        vendor_id:
+          type: string
+          format: uuid
+        issue_date:
+          type: string
+          format: date
+        due_date:
+          type: string
+          format: date
+        subtotal:
+          type: number
+        tax_amount:
+          type: number
+        total_amount:
+          type: number
+        status:
+          $ref: '#/components/schemas/InvoiceStatus'
+
+    Transaction:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        transaction_date:
+          type: string
+          format: date
+        amount:
+          type: number
+        currency:
+          type: string
+          default: KRW
+        vendor_id:
+          type: string
+          format: uuid
+          nullable: true
+        account_code:
+          type: string
+          nullable: true
+        department_id:
+          type: string
+          format: uuid
+          nullable: true
+        description:
+          type: string
+          nullable: true
+        status:
+          $ref: '#/components/schemas/TransactionStatus'
+        ai_classification_confidence:
+          type: number
+          nullable: true
+        source:
+          type: string
+          enum: [card, bank, manual, ocr]
+
+security:
+  - BearerAuth: []
+
+paths:
+  /health:
+    get:
+      summary: Health check
+      security: []
+      tags: [health]
+      responses:
+        '200':
+          description: Service healthy
+
+  /api/v1/settlements:
+    post:
+      summary: 정산 생성
+      tags: [settlements]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [vendor_id, period_start, period_end]
+              properties:
+                vendor_id:
+                  type: string
+                  format: uuid
+                period_start:
+                  type: string
+                  format: date
+                period_end:
+                  type: string
+                  format: date
+                notes:
+                  type: string
+      responses:
+        '201':
+          description: Settlement created
+    get:
+      summary: 정산 목록
+      tags: [settlements]
+      parameters:
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 20
+        - in: query
+          name: vendor_id
+          schema:
+            type: string
+            format: uuid
+        - in: query
+          name: status
+          schema:
+            $ref: '#/components/schemas/SettlementStatus'
+      responses:
+        '200':
+          description: Settlement list
+
+  /api/v1/settlements/{id}:
+    get:
+      summary: 정산 상세
+      tags: [settlements]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Settlement detail
+
+  /api/v1/settlements/{id}/approve:
+    patch:
+      summary: 정산 승인
+      tags: [settlements]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                notes:
+                  type: string
+      responses:
+        '200':
+          description: Settlement approved
+
+  /api/v1/settlements/{id}/reject:
+    patch:
+      summary: 정산 반려
+      tags: [settlements]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                notes:
+                  type: string
+      responses:
+        '200':
+          description: Settlement rejected
+
+  /api/v1/invoices:
+    post:
+      summary: 청구서 생성
+      tags: [invoices]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [vendor_id, issue_date, due_date, items]
+              properties:
+                vendor_id:
+                  type: string
+                  format: uuid
+                issue_date:
+                  type: string
+                  format: date
+                due_date:
+                  type: string
+                  format: date
+                items:
+                  type: array
+                notes:
+                  type: string
+      responses:
+        '201':
+          description: Invoice created
+
+  /api/v1/invoices/{id}/send:
+    post:
+      summary: 청구서 발송
+      tags: [invoices]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Invoice sent
+
+  /api/v1/invoices/{id}/paid:
+    patch:
+      summary: 결제 완료 처리
+      tags: [invoices]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Invoice marked as paid
+
+  /api/v1/transactions:
+    post:
+      summary: 거래 등록
+      tags: [transactions]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '201':
+          description: Transaction created
+    get:
+      summary: 거래 목록
+      tags: [transactions]
+      responses:
+        '200':
+          description: Transaction list
+
+  /api/v1/transactions/{id}/classify:
+    patch:
+      summary: AI 분류 결과 수정
+      tags: [transactions]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Transaction classified
+
+  /api/v1/ar:
+    get:
+      summary: 미수금 현황
+      tags: [ar]
+      responses:
+        '200':
+          description: AR status
+
+  /api/v1/ar/overdue:
+    get:
+      summary: 연체 목록
+      tags: [ar]
+      responses:
+        '200':
+          description: Overdue invoices
+
+  /api/v1/reports/cashflow:
+    get:
+      summary: 현금흐름 리포트
+      tags: [reports]
+      parameters:
+        - in: query
+          name: start_date
+          required: true
+          schema:
+            type: string
+            format: date
+        - in: query
+          name: end_date
+          required: true
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: Cashflow report
+
+  /api/v1/reports/expense:
+    get:
+      summary: 비용 분석 리포트
+      tags: [reports]
+      parameters:
+        - in: query
+          name: start_date
+          required: true
+          schema:
+            type: string
+            format: date
+        - in: query
+          name: end_date
+          required: true
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: Expense report

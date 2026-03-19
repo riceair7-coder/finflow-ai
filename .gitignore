@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+*.egg-info/
+.env
+.env.local
+
+# SQLite 로컬 DB (개발용)
+*.db
+*.db-shm
+*.db-wal
+
+# Node
+node_modules/
+dist/
+.cache/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+.DS_Store
+
+# Logs
+*.log
+logs/
+
+# MLflow
+mlruns/
+
+# Docker
+.docker/

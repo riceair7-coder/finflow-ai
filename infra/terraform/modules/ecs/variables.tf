@@ -1,0 +1,11 @@
+variable "app_name" { type = string }
+variable "environment" { type = string }
+variable "aws_region" { type = string }
+variable "vpc_id" { type = string }
+variable "private_subnets" { type = list(string) }
+variable "alb_target_group_arn" { type = string }
+variable "api_image" { type = string }
+variable "ai_engine_image" { type = string }
+variable "api_desired_count" { type = number }
+variable "db_secret_arn" { type = string }
+variable "redis_endpoint" { type = string }
