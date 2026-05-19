@@ -25,6 +25,7 @@ interface FormState {
   name: string
   department_id: string
   role: UserRole
+  secondary_emails: string[]
 }
 
 function UserForm({
@@ -43,10 +44,31 @@ function UserForm({
     name: defaultValues?.name ?? '',
     department_id: defaultValues?.department_id ?? '',
     role: defaultValues?.role ?? 'member',
+    secondary_emails: defaultValues?.secondary_emails ?? [],
   })
+  const [secondaryInput, setSecondaryInput] = useState('')
 
   const set = (k: keyof FormState) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
     setForm(prev => ({ ...prev, [k]: e.target.value as any }))
+
+  const addSecondaryEmail = () => {
+    const v = secondaryInput.trim().toLowerCase()
+    if (!v) return
+    if (v === form.email.trim().toLowerCase()) {
+      alert('보조 이메일이 주 이메일과 동일합니다.')
+      return
+    }
+    if (form.secondary_emails.includes(v)) {
+      alert('이미 추가된 이메일입니다.')
+      return
+    }
+    setForm(prev => ({ ...prev, secondary_emails: [...prev.secondary_emails, v] }))
+    setSecondaryInput('')
+  }
+
+  const removeSecondaryEmail = (em: string) => {
+    setForm(prev => ({ ...prev, secondary_emails: prev.secondary_emails.filter(e => e !== em) }))
+  }
 
   const canSubmit = editMode
     ? form.email.trim().length > 0
@@ -103,6 +125,36 @@ function UserForm({
         </div>
       </div>
 
+      <div>
+        <label className="block text-xs font-medium text-gray-600 mb-1.5">
+          보조 이메일 <span className="text-gray-400 font-normal">(매입세금계산서 수령 이메일 추가 매칭용)</span>
+        </label>
+        <div className="flex gap-2">
+          <input
+            value={secondaryInput}
+            onChange={e => setSecondaryInput(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addSecondaryEmail() } }}
+            placeholder="email@example.com"
+            className="flex-1 rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
+          />
+          <button
+            type="button"
+            onClick={addSecondaryEmail}
+            className="rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+          >추가</button>
+        </div>
+        {form.secondary_emails.length > 0 && (
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {form.secondary_emails.map(em => (
+              <span key={em} className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-700">
+                {em}
+                <button type="button" onClick={() => removeSecondaryEmail(em)} className="text-blue-400 hover:text-blue-700">✕</button>
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
+
       <div className="flex justify-end gap-2 pt-2 border-t">
         <button onClick={onCancel} className="rounded-lg px-4 py-2 text-sm text-gray-600 hover:bg-gray-50">취소</button>
         <button
@@ -144,6 +196,7 @@ export function UsersPage() {
       name: body.name.trim() || undefined,
       department_id: body.department_id || undefined,
       role: body.role,
+      secondary_emails: body.secondary_emails,
     } as UserCreate),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['users'] }); setShowAdd(false) },
     onError: (err: any) => alert(err?.response?.data?.detail ?? '등록 실패'),
@@ -155,6 +208,7 @@ export function UsersPage() {
         name: body.name.trim() || undefined,
         department_id: body.department_id || null,
         role: body.role,
+        secondary_emails: body.secondary_emails,
       }
       if (body.password) data.password = body.password
       return usersApi.update(id, data)
@@ -167,6 +221,12 @@ export function UsersPage() {
     mutationFn: (id: string) => usersApi.delete(id),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['users'] }),
     onError: (err: any) => alert(err?.response?.data?.detail ?? '비활성화 실패'),
+  })
+
+  const permanentDeleteMutation = useMutation({
+    mutationFn: (id: string) => usersApi.permanentDelete(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['users'] }),
+    onError: (err: any) => alert(err?.response?.data?.detail ?? '영구 삭제 실패'),
   })
 
   return (
@@ -218,7 +278,16 @@ export function UsersPage() {
                 const isMe = me?.id === u.id
                 return (
                   <tr key={u.id} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-5 py-3.5 font-mono text-xs text-gray-700">{u.email}{isMe && <span className="ml-1 text-blue-500">(나)</span>}</td>
+                    <td className="px-5 py-3.5 font-mono text-xs text-gray-700">
+                      <div>{u.email}{isMe && <span className="ml-1 text-blue-500">(나)</span>}</div>
+                      {u.secondary_emails && u.secondary_emails.length > 0 && (
+                        <div className="mt-1 flex flex-wrap gap-1">
+                          {u.secondary_emails.map(em => (
+                            <span key={em} className="inline-block rounded bg-gray-50 px-1.5 py-0.5 text-[10px] text-gray-500">+{em}</span>
+                          ))}
+                        </div>
+                      )}
+                    </td>
                     <td className="px-5 py-3.5 font-medium text-gray-900">{u.name ?? '-'}</td>
                     <td className="px-5 py-3.5">
                       {dept
@@ -248,6 +317,16 @@ export function UsersPage() {
                           }}
                           className="rounded-lg px-3 py-1 text-xs text-rose-700 hover:bg-rose-50"
                         >비활성화</button>
+                      )}
+                      {!isMe && !u.is_active && (
+                        <button
+                          onClick={() => {
+                            if (confirm(`${u.email}을(를) 영구 삭제합니다.\n같은 이메일로 재등록할 수 있게 됩니다.\n계속하시겠습니까?`)) {
+                              permanentDeleteMutation.mutate(u.id)
+                            }
+                          }}
+                          className="rounded-lg px-3 py-1 text-xs text-white bg-rose-600 hover:bg-rose-700"
+                        >삭제</button>
                       )}
                     </td>
                   </tr>
@@ -279,6 +358,7 @@ export function UsersPage() {
               name: editTarget.name ?? '',
               department_id: editTarget.department_id ?? '',
               role: editTarget.role,
+              secondary_emails: editTarget.secondary_emails ?? [],
             }}
             onSubmit={(body) => updateMutation.mutate({ id: editTarget.id, body })}
             onCancel={() => setEditTarget(null)}

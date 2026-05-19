@@ -76,6 +76,18 @@ async def migrate_schema() -> None:
         )""",
         "CREATE INDEX IF NOT EXISTS ix_settlement_attachments_settlement_id "
         "ON settlement_attachments (settlement_id)",
+        # 공급받는자 이메일 → 부서 매칭 (007)
+        "ALTER TABLE transactions ADD COLUMN IF NOT EXISTS buyer_email1 VARCHAR(200)",
+        "ALTER TABLE transactions ADD COLUMN IF NOT EXISTS buyer_email2 VARCHAR(200)",
+        # 사용자 보조 이메일 테이블 (008)
+        """CREATE TABLE IF NOT EXISTS user_secondary_emails (
+            id VARCHAR(36) PRIMARY KEY,
+            user_id VARCHAR(36) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            email VARCHAR(200) NOT NULL UNIQUE,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )""",
+        "CREATE INDEX IF NOT EXISTS ix_user_secondary_emails_user_id "
+        "ON user_secondary_emails (user_id)",
     ]
     # 각 statement를 별도 트랜잭션으로 — 하나가 실패해도(이미 존재 등) 후속은 진행
     for sql in statements:

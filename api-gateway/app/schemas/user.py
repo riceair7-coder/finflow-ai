@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Optional
+from typing import List, Optional
 
 from pydantic import BaseModel, Field
 
@@ -12,6 +12,7 @@ class UserCreate(BaseModel):
     name: Optional[str] = None
     department_id: Optional[str] = None
     role: UserRole = UserRole.member
+    secondary_emails: List[str] = Field(default_factory=list)
 
 
 class UserUpdate(BaseModel):
@@ -20,6 +21,8 @@ class UserUpdate(BaseModel):
     role: Optional[UserRole] = None
     is_active: Optional[bool] = None
     password: Optional[str] = Field(None, min_length=8)
+    # None이면 변경 없음, list이면 전체 교체(빈 리스트는 모두 삭제)
+    secondary_emails: Optional[List[str]] = None
 
 
 class UserOut(BaseModel):
@@ -34,6 +37,7 @@ class UserOut(BaseModel):
     last_login_at: Optional[datetime] = None
     created_at: datetime
     updated_at: datetime
+    secondary_emails: List[str] = Field(default_factory=list)
 
 
 class LoginRequest(BaseModel):
@@ -45,3 +49,8 @@ class LoginResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
     user: UserOut
+
+
+class PasswordChangeRequest(BaseModel):
+    current_password: str = Field(..., min_length=1)
+    new_password: str = Field(..., min_length=8)

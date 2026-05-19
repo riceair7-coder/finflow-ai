@@ -9,6 +9,7 @@ export interface UserCreate {
   name?: string
   department_id?: string
   role?: UserRole
+  secondary_emails?: string[]
 }
 
 export interface UserUpdate {
@@ -17,6 +18,8 @@ export interface UserUpdate {
   role?: UserRole
   is_active?: boolean
   password?: string
+  // null/undefined면 변경 없음, []면 모두 삭제, list면 전체 교체
+  secondary_emails?: string[]
 }
 
 export const usersApi = {
@@ -31,4 +34,7 @@ export const usersApi = {
 
   delete: (id: string) =>
     apiClient.delete<{ success: boolean; data: { id: string } }>(`/api/v1/users/${id}`),
+
+  permanentDelete: (id: string) =>
+    apiClient.delete<{ success: boolean; data: { id: string } }>(`/api/v1/users/${id}/permanent`),
 }

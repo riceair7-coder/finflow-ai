@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { BrowserRouter, Routes, Route, NavLink } from 'react-router-dom'
 import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/react-query'
 
@@ -11,6 +11,7 @@ import { DepartmentsPage } from './pages/DepartmentsPage'
 import { UsersPage } from './pages/UsersPage'
 import { LoginPage } from './pages/LoginPage'
 import { NotificationToastContainer } from './components/common/NotificationToast'
+import { ChangePasswordModal } from './components/auth/ChangePasswordModal'
 import { useWebSocket } from './hooks/useWebSocket'
 import { useNotificationStore } from './store/notificationStore'
 import { useAuthStore } from './store/authStore'
@@ -53,6 +54,7 @@ function Layout({ children }: { children: React.ReactNode }) {
   const clearAuth = useAuthStore(s => s.clear)
   const isAdmin = user?.role === 'admin'
   const navItems = baseNav.filter(n => !n.adminOnly || isAdmin)
+  const [showChangePassword, setShowChangePassword] = useState(false)
 
   return (
     <div className="flex min-h-screen bg-slate-50">
@@ -101,6 +103,12 @@ function Layout({ children }: { children: React.ReactNode }) {
             </div>
           </div>
           <button
+            onClick={() => setShowChangePassword(true)}
+            className="w-full rounded-lg border border-gray-200 px-3 py-1.5 text-xs text-gray-600 hover:bg-gray-50"
+          >
+            비밀번호 변경
+          </button>
+          <button
             onClick={() => {
               clearAuth()
               window.location.href = window.location.origin + '/'
@@ -115,6 +123,8 @@ function Layout({ children }: { children: React.ReactNode }) {
       <main className="flex-1 overflow-auto">
         <div className="p-6">{children}</div>
       </main>
+
+      {showChangePassword && <ChangePasswordModal onClose={() => setShowChangePassword(false)} />}
     </div>
   )
 }

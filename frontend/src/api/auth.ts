@@ -12,6 +12,7 @@ export interface User {
   last_login_at?: string | null
   created_at: string
   updated_at: string
+  secondary_emails: string[]
 }
 
 export interface LoginResponse {
@@ -26,4 +27,7 @@ export const authApi = {
 
   me: () =>
     apiClient.get<{ success: boolean; data: User }>('/api/v1/auth/me'),
+
+  changePassword: (current_password: string, new_password: string) =>
+    apiClient.post<{ success: boolean; data: { id: string } }>('/api/v1/auth/change-password', { current_password, new_password }),
 }

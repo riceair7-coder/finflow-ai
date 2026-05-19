@@ -11,6 +11,7 @@ from app.database import get_db
 from app.models.settlement import Settlement
 from app.models.transaction import Transaction, TransactionSource, TransactionStatus
 from app.models.user import User, UserRole
+from app.models.user_email import UserSecondaryEmail
 from app.models.vendor import Vendor
 from app.schemas.common import ApiResponse, PaginatedResponse, PaginationMeta
 from app.schemas.transaction import (
@@ -448,8 +449,8 @@ async def import_tax_invoice(
         - source=hometax, status=classified, ai_classification_confidence=1.0.
         - description은 품목명(없으면 공급자 상호)으로 설정.
         - 부서 매칭 우선순위:
-            1) 공급받는자 이메일1 → users.email → user.department_id
-            2) 공급받는자 이메일2 → users.email → user.department_id
+            1) 공급받는자 이메일1 → users.email 또는 보조 이메일 → user.department_id
+            2) 공급받는자 이메일2 → users.email 또는 보조 이메일 → user.department_id
             3) (폴백) vendor.department_id
     """
     if not file.filename or not file.filename.lower().endswith(".xls"):
@@ -483,6 +484,7 @@ async def import_tax_invoice(
 
     email_to_dept: dict[str, str] = {}
     if email_set:
+        # primary email 매칭
         u_rows = await db.execute(
             select(User.email, User.department_id).where(
                 func.lower(User.email).in_(email_set),
@@ -493,6 +495,20 @@ async def import_tax_invoice(
         for em, dept in u_rows.all():
             if dept:
                 email_to_dept[em.lower()] = dept
+
+        # secondary email 매칭 — primary에서 못 잡은 이메일을 보강
+        s_rows = await db.execute(
+            select(UserSecondaryEmail.email, User.department_id)
+            .join(User, User.id == UserSecondaryEmail.user_id)
+            .where(
+                func.lower(UserSecondaryEmail.email).in_(email_set),
+                User.is_active == True,  # noqa: E712
+                User.department_id.isnot(None),
+            )
+        )
+        for em, dept in s_rows.all():
+            if dept:
+                email_to_dept.setdefault(em.lower(), dept)
 
     # Vendor 캐시 (BRN → Vendor)
     vendor_cache: dict[str, Vendor] = {}
