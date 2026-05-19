@@ -38,7 +38,7 @@ export const STATUS_LABELS: Record<string, string> = {
   reviewing: '검토중',
   approved: '승인됨',
   rejected: '반려됨',
-  paid: '지급완료',
+  paid: '결제완료',
   draft: '초안',
   sent: '발송됨',
   overdue: '연체',

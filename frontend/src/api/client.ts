@@ -20,8 +20,12 @@ apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
+      const hadToken = !!localStorage.getItem('access_token')
       localStorage.removeItem('access_token')
-      window.location.href = '/login'
+      localStorage.removeItem('current_user')
+      if (hadToken) {
+        window.location.href = window.location.origin + '/'
+      }
     }
     return Promise.reject(error)
   },

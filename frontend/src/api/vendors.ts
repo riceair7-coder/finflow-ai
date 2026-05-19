@@ -1,5 +1,11 @@
 import { apiClient } from './client'
 
+export interface BankInfo {
+  bank_name?: string
+  account_no?: string
+  holder?: string
+}
+
 export interface Vendor {
   id: string
   business_registration_no: string
@@ -8,7 +14,7 @@ export interface Vendor {
   address?: string
   phone?: string
   email?: string
-  bank_info?: Record<string, string>
+  bank_info?: BankInfo | null
   payment_terms_days: number
   credit_limit?: number
   department_id?: string
@@ -24,6 +30,7 @@ export interface VendorCreate {
   address?: string
   phone?: string
   email?: string
+  bank_info?: BankInfo | null
   payment_terms_days?: number
   credit_limit?: number
   department_id?: string
@@ -47,4 +54,14 @@ export const vendorsApi = {
 
   lookupByBRN: (brn: string) =>
     apiClient.get<{ success: boolean; data: Vendor }>(`/api/v1/vendors/lookup/by-brn/${brn}`),
+
+  bulkAssignDepartment: (data: {
+    vendor_ids: string[]
+    department_id: string | null
+    apply_to_existing_transactions?: boolean
+  }) =>
+    apiClient.post<{
+      success: boolean
+      data: { updated: number; transactions_updated: number; department_id: string | null }
+    }>('/api/v1/vendors/bulk-assign-department', data),
 }

@@ -1,28 +1,32 @@
-import React from 'react'
+import { useEffect } from 'react'
 import { BrowserRouter, Routes, Route, NavLink } from 'react-router-dom'
 import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/react-query'
 
 import { DashboardPage } from './pages/DashboardPage'
 import { SettlementsPage } from './pages/SettlementsPage'
 import { InvoicesPage } from './pages/InvoicesPage'
-import { ARPage } from './pages/ARPage'
 import { VendorsPage } from './pages/VendorsPage'
 import { TransactionsPage } from './pages/TransactionsPage'
+import { DepartmentsPage } from './pages/DepartmentsPage'
+import { UsersPage } from './pages/UsersPage'
+import { LoginPage } from './pages/LoginPage'
 import { NotificationToastContainer } from './components/common/NotificationToast'
 import { useWebSocket } from './hooks/useWebSocket'
 import { useNotificationStore } from './store/notificationStore'
+import { useAuthStore } from './store/authStore'
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { staleTime: 30_000, retry: 1 } },
 })
 
-const navItems = [
-  { to: '/',            label: '대시보드',   icon: '◈',  end: true },
-  { to: '/transactions', label: '거래 내역',  icon: '↔',  end: false },
-  { to: '/settlements',  label: '정산 관리',  icon: '≡',  end: false },
-  { to: '/invoices',     label: '청구서',     icon: '◻',  end: false },
-  { to: '/ar',           label: '미수금',     icon: '⚠',  end: false },
-  { to: '/vendors',      label: '공급자 관리', icon: '⊞', end: false },
+const baseNav = [
+  { to: '/',            label: '대시보드',   icon: '◈',  end: true,  adminOnly: false },
+  { to: '/transactions', label: '거래 내역',  icon: '↔',  end: false, adminOnly: false },
+  { to: '/settlements',  label: '정산 관리',  icon: '≡',  end: false, adminOnly: false },
+  { to: '/invoices',     label: '청구서',     icon: '◻',  end: false, adminOnly: false },
+  { to: '/vendors',      label: '공급자 관리', icon: '⊞', end: false, adminOnly: true },
+  { to: '/departments',  label: '부서 관리',   icon: '▦',  end: false, adminOnly: true },
+  { to: '/users',        label: '사용자 관리', icon: '⎔',  end: false, adminOnly: true },
 ]
 
 function RealtimeHandler() {
@@ -45,6 +49,11 @@ function RealtimeHandler() {
 }
 
 function Layout({ children }: { children: React.ReactNode }) {
+  const user = useAuthStore(s => s.user)
+  const clearAuth = useAuthStore(s => s.clear)
+  const isAdmin = user?.role === 'admin'
+  const navItems = baseNav.filter(n => !n.adminOnly || isAdmin)
+
   return (
     <div className="flex min-h-screen bg-slate-50">
       <aside className="flex w-56 flex-col border-r bg-white shadow-sm">
@@ -60,7 +69,7 @@ function Layout({ children }: { children: React.ReactNode }) {
         </div>
 
         {/* 네비게이션 */}
-        <nav className="flex-1 space-y-0.5 p-3">
+        <nav className="flex-1 space-y-0.5 p-3 overflow-y-auto">
           {navItems.map(({ to, label, icon, end }) => (
             <NavLink
               key={to}
@@ -80,15 +89,26 @@ function Layout({ children }: { children: React.ReactNode }) {
           ))}
         </nav>
 
-        {/* 하단 */}
-        <div className="border-t p-4">
+        {/* 하단: 사용자 정보 + 로그아웃 */}
+        <div className="border-t p-4 space-y-2">
           <div className="flex items-center gap-2.5 rounded-xl bg-gray-50 px-3 py-2.5">
-            <div className="h-7 w-7 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 text-center text-xs font-bold leading-7 text-white">관</div>
-            <div className="min-w-0">
-              <p className="truncate text-xs font-medium text-gray-700">관리자</p>
-              <p className="truncate text-xs text-gray-400">admin</p>
+            <div className="h-7 w-7 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 text-center text-xs font-bold leading-7 text-white">
+              {(user?.name || user?.email || '?').charAt(0).toUpperCase()}
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-xs font-medium text-gray-700">{user?.name || user?.email}</p>
+              <p className="truncate text-xs text-gray-400">{user?.role ?? '-'}</p>
             </div>
           </div>
+          <button
+            onClick={() => {
+              clearAuth()
+              window.location.href = window.location.origin + '/'
+            }}
+            className="w-full rounded-lg border border-gray-200 px-3 py-1.5 text-xs text-gray-600 hover:bg-gray-50"
+          >
+            로그아웃
+          </button>
         </div>
       </aside>
 
@@ -100,6 +120,21 @@ function Layout({ children }: { children: React.ReactNode }) {
 }
 
 function AppInner() {
+  const user = useAuthStore(s => s.user)
+  const hydrate = useAuthStore(s => s.hydrate)
+  const isAdmin = user?.role === 'admin'
+
+  useEffect(() => { hydrate() }, [hydrate])
+
+  if (!user) {
+    return (
+      <>
+        <LoginPage />
+        <NotificationToastContainer />
+      </>
+    )
+  }
+
   return (
     <>
       <RealtimeHandler />
@@ -110,8 +145,9 @@ function AppInner() {
             <Route path="/transactions" element={<TransactionsPage />} />
             <Route path="/settlements"  element={<SettlementsPage />} />
             <Route path="/invoices"     element={<InvoicesPage />} />
-            <Route path="/ar"           element={<ARPage />} />
-            <Route path="/vendors"      element={<VendorsPage />} />
+            {isAdmin && <Route path="/vendors"      element={<VendorsPage />} />}
+            {isAdmin && <Route path="/departments"  element={<DepartmentsPage />} />}
+            {isAdmin && <Route path="/users"        element={<UsersPage />} />}
           </Routes>
         </Layout>
       </BrowserRouter>

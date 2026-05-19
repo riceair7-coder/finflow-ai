@@ -23,6 +23,13 @@ class Invoice(Base):
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     invoice_no: Mapped[str] = mapped_column(String(50), unique=True, nullable=False)
     vendor_id: Mapped[str] = mapped_column(String(36), ForeignKey("vendors.id", ondelete="RESTRICT"), nullable=False)
+    department_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    settlement_id: Mapped[str | None] = mapped_column(
+        String(36),
+        ForeignKey("settlements.id", ondelete="SET NULL"),
+        unique=True,
+        nullable=True,
+    )
     issue_date: Mapped[date] = mapped_column(Date, nullable=False)
     due_date: Mapped[date] = mapped_column(Date, nullable=False)
     subtotal: Mapped[float] = mapped_column(Numeric(15, 2), nullable=False)

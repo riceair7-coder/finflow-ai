@@ -28,6 +28,8 @@ class InvoiceOut(BaseModel):
     id: uuid.UUID
     invoice_no: str
     vendor_id: uuid.UUID
+    department_id: Optional[str] = None
+    settlement_id: Optional[str] = None
     issue_date: date
     due_date: date
     subtotal: float
