@@ -7,6 +7,8 @@ venv/
 *.egg-info/
 .env
 .env.local
+.env.*
+!.env.example
 
 # SQLite 로컬 DB (개발용)
 *.db
@@ -33,3 +35,11 @@ mlruns/
 
 # Docker
 .docker/
+
+# 편집 전 수동 백업과 스냅샷 디렉토리 — git 이력이 대신한다
+*.bak
+*.bak.*
+*.bak_*
+.backups/
+*.bak2*
+*.bak[0-9]*

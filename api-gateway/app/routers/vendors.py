@@ -1,13 +1,15 @@
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
+from app.models.account import Department
+from app.models.transaction import Transaction
 from app.models.vendor import Vendor
 from app.schemas.common import ApiResponse, PaginatedResponse, PaginationMeta
-from app.schemas.vendor import VendorCreate, VendorOut, VendorUpdate
+from app.schemas.vendor import VendorBulkAssignDepartment, VendorCreate, VendorOut, VendorUpdate
 
 router = APIRouter()
 
@@ -93,6 +95,55 @@ async def delete_vendor(vendor_id: str, db: AsyncSession = Depends(get_db)):
     vendor.is_active = False
     await db.commit()
     return ApiResponse(success=True, data={"id": vendor_id})
+
+
+@router.post("/bulk-assign-department", response_model=ApiResponse[dict])
+async def bulk_assign_department(
+    body: VendorBulkAssignDepartment,
+    db: AsyncSession = Depends(get_db),
+):
+    """선택한 공급자들의 담당 부서를 일괄 변경한다.
+
+    department_id=None 이면 미배정 상태로 되돌림.
+    """
+    if not body.vendor_ids:
+        return ApiResponse(
+            success=True,
+            data={"updated": 0, "transactions_updated": 0, "department_id": None},
+        )
+
+    # 부서 존재 검증
+    dept_id = body.department_id or None
+    if dept_id:
+        d_row = await db.execute(select(Department).where(Department.id == dept_id))
+        if not d_row.scalar_one_or_none():
+            raise HTTPException(status_code=400, detail="부서를 찾을 수 없습니다.")
+
+    v_rows = await db.execute(select(Vendor).where(Vendor.id.in_(body.vendor_ids)))
+    vendors = v_rows.scalars().all()
+
+    for v in vendors:
+        v.department_id = dept_id
+
+    # 옵션: 해당 공급자들의 기존 거래에도 부서 적용 (이미 다른 부서로 분류된 것도 덮어씀)
+    transactions_updated = 0
+    if body.apply_to_existing_transactions and body.vendor_ids:
+        tx_result = await db.execute(
+            update(Transaction)
+            .where(Transaction.vendor_id.in_(body.vendor_ids))
+            .values(department_id=dept_id)
+        )
+        transactions_updated = tx_result.rowcount or 0
+
+    await db.commit()
+    return ApiResponse(
+        success=True,
+        data={
+            "updated": len(vendors),
+            "transactions_updated": transactions_updated,
+            "department_id": dept_id,
+        },
+    )
 
 
 @router.get("/lookup/by-brn/{brn}", response_model=ApiResponse[VendorOut])

@@ -26,5 +26,10 @@ class Settings(BaseSettings):
     environment: str = "development"
     log_level: str = "INFO"
 
+    # 첫 admin 부트스트랩 (.env.prod에서 주입)
+    admin_email: str | None = None
+    admin_password: str | None = None
+    admin_name: str = "Admin"
+
 
 settings = Settings()

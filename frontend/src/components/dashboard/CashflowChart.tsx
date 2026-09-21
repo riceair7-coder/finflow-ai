@@ -28,20 +28,47 @@ export function CashflowChart({ startDate, endDate }: Props) {
   const start = startDate ?? dayjs().subtract(6, 'month').format('YYYY-MM-DD')
   const end = endDate ?? dayjs().format('YYYY-MM-DD')
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['cashflow', start, end],
     queryFn: () => reportsApi.cashflow(start, end),
   })
 
+  const chartData: { month: string; total: number }[] = data?.data.data.cashflow ?? []
+  const hasValues = chartData.some(d => Number(d.total) > 0)
+
   if (isLoading) {
     return (
-      <div className="flex h-64 items-center justify-center rounded-xl border bg-white">
-        <p className="text-sm text-gray-400">로딩 중...</p>
+      <div className="rounded-xl border bg-white p-5 shadow-sm">
+        <h3 className="mb-4 text-sm font-semibold text-gray-700">월별 현금흐름</h3>
+        <div className="h-60 animate-pulse rounded-lg bg-gray-100" />
       </div>
     )
   }
 
-  const chartData = data?.data.data.cashflow ?? []
+  // 빈 컨테이너만 남던 문제 — 실패/무데이터를 명시적으로 알린다
+  if (isError || !hasValues) {
+    return (
+      <div className="rounded-xl border bg-white p-5 shadow-sm">
+        <h3 className="mb-4 text-sm font-semibold text-gray-700">월별 현금흐름</h3>
+        <div className="flex h-60 flex-col items-center justify-center gap-2 rounded-lg bg-gray-50 text-center">
+          <span className="text-2xl text-gray-300">📊</span>
+          <p className="text-sm text-gray-500">
+            {isError ? '차트를 불러오지 못했습니다.' : '해당 기간에 거래 데이터가 없습니다.'}
+          </p>
+          <p className="text-xs text-gray-400">{start} ~ {end}</p>
+          {isError && (
+            <button
+              type="button"
+              onClick={() => refetch()}
+              className="mt-1 rounded-lg border border-gray-200 px-3 py-1 text-xs text-gray-600 hover:bg-white"
+            >
+              다시 시도
+            </button>
+          )}
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="rounded-xl border bg-white p-5 shadow-sm">

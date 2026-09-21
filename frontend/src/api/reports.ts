@@ -10,8 +10,20 @@ export interface DashboardSummary {
   overdue_count: number
   approved_settlement_count: number
   approved_settlement_amount: number
+  prepaid_count: number
+  prepaid_amount: number
+  prepaid_month_count: number
+  prepaid_month_amount: number
   ai_classified_pct: number
   ai_pending_pct: number
+  /** 정산관리 '미정산 공급자'와 동일 기준의 미정산 거래 */
+  unsettled_count: number
+  unsettled_amount: number
+  unsettled_vendor_count: number
+  /** 이상치 알림용 */
+  unassigned_dept_count: number
+  outlier_count: number
+  outlier_max_amount: number
 }
 
 export interface CashflowData {

@@ -6,10 +6,37 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from prometheus_fastapi_instrumentator import Instrumentator
 
-from app.routers import transactions, settlements, invoices, ar_tracker, reports, vendors, departments
+from app.routers import auth, transactions, settlements, invoices, ar_tracker, reports, vendors, departments, users
 from app.websocket.router import router as ws_router
 from app.core.exceptions import add_exception_handlers
-from app.database import create_tables, AsyncSessionLocal
+from app.database import create_tables, migrate_schema, AsyncSessionLocal
+
+
+async def _bootstrap_admin():
+    """ADMIN_EMAIL/PASSWORD가 .env에 있고 해당 사용자가 없으면 admin 계정 생성."""
+    import uuid as _uuid
+    from sqlalchemy import select
+    from app.config import settings as _settings
+    from app.models.user import User, UserRole
+    from app.services.auth_service import hash_password
+
+    if not _settings.admin_email or not _settings.admin_password:
+        return
+
+    async with AsyncSessionLocal() as db:
+        existing = await db.execute(select(User).where(User.email == _settings.admin_email))
+        if existing.scalar_one_or_none():
+            return
+        db.add(User(
+            id=str(_uuid.uuid4()),
+            email=_settings.admin_email,
+            hashed_password=hash_password(_settings.admin_password),
+            name=_settings.admin_name,
+            role=UserRole.admin,
+            is_active=True,
+        ))
+        await db.commit()
+        print(f"✅ 부트스트랩 admin 생성: {_settings.admin_email}")
 
 
 async def _seed_demo_data():
@@ -151,6 +178,8 @@ async def _seed_demo_data():
 async def lifespan(app: FastAPI):
     # startup
     await create_tables()
+    await migrate_schema()
+    await _bootstrap_admin()
     await _seed_demo_data()
     yield
     # shutdown (필요 시 정리)
@@ -173,6 +202,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(auth.router, prefix="/api/v1/auth", tags=["auth"])
+app.include_router(users.router, prefix="/api/v1/users", tags=["users"])
 app.include_router(transactions.router, prefix="/api/v1/transactions", tags=["transactions"])
 app.include_router(settlements.router, prefix="/api/v1/settlements", tags=["settlements"])
 app.include_router(invoices.router, prefix="/api/v1/invoices", tags=["invoices"])

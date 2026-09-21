@@ -1,0 +1,102 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: finflow
+      POSTGRES_USER: finflow
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - finflow_postgres_data:/var/lib/postgresql/data
+    networks:
+      - finflow-net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U finflow"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    command: redis-server --appendonly yes
+    volumes:
+      - finflow_redis_data:/data
+    networks:
+      - finflow-net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build:
+      context: ./api-gateway
+      dockerfile: Dockerfile.dev
+    ports:
+      - "8504:8000"
+    env_file: .env.prod
+    volumes:
+      - ./storage:/app/storage
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - finflow-net
+    restart: unless-stopped
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000
+
+#  celery-worker:
+#    build:
+#      context: ./api-gateway
+#      dockerfile: Dockerfile.dev
+#    env_file: .env.prod
+#    depends_on:
+#      postgres:
+#        condition: service_healthy
+#      redis:
+#        condition: service_healthy
+#    networks:
+#      - finflow-net
+#    restart: unless-stopped
+#    command: celery -A app.celery_app worker --loglevel=info
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.prod
+      args:
+        VITE_API_URL: https://erp.zzixx.com
+    ports:
+      - "3003:80"
+    networks:
+      - finflow-net
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:10.4.0
+    ports:
+      - "3005:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD}
+      GF_SERVER_ROOT_URL: https://erp.zzixx.com/finflow/monitor
+      GF_SERVER_SERVE_FROM_SUB_PATH: "true"
+    volumes:
+      - finflow_grafana_data:/var/lib/grafana
+    networks:
+      - finflow-net
+    restart: unless-stopped
+
+networks:
+  finflow-net:
+    driver: bridge
+
+volumes:
+  finflow_postgres_data:
+  finflow_redis_data:
+  finflow_grafana_data:
